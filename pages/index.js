@@ -1,97 +1,76 @@
-import axios from 'axios';
+import PropTypes from 'prop-types';
 import React from 'react';
-import { download } from './utils/download-utils';
-import { fetchPokemonByIds } from './pokeapi/fetch-pokemon';
+import { Card } from '../components/Card';
+import { ClearAction, DownloadAction, RandomizeAction } from '../components/DeckActions';
+import { DeckForm } from '../components/DeckForm';
+import { Layout } from '../components/Layout';
+import { PokemonCards } from '../components/PokemonCards';
+import { Sprite } from '../components/Sprite';
+import { useDeck } from '../lib/use-deck';
+import { useOnScreen } from '../lib/use-on-screen';
+import { getStaticPokemonByGen } from '../lib/utils/static-utils';
+import classes from '../styles/Home.module.css';
 
-const initialState = [null, null, null, null, null, null];
+export const getStaticProps = getStaticPokemonByGen(1);
 
-export const useDeck = (initial = initialState) => {
-  // Start with a deck of 6
-  const [deck, setDeck] = React.useState(initial);
-  const [name, setName] = React.useState(null);
+export default function Home({ pokemon }) { 
+  const { deck, clearDeck, downloadDeck, randomizeDeck, fetchDeck, toggleHandler, isSelected } =
+    useDeck();
+  const ref = React.useRef();
+  const isDeckOnScreen = useOnScreen(ref);
 
-  const toggleHandler = (pokemon) => () => {
-    let newDeck = [...deck];
+  return (
+    <Layout title={'Home'}>
+      <section id="deck" className={classes.deckContainer}>
+        <h2>Deck</h2>
 
-    // Given a pokemon how can I:
-    // 1. Add it to my deck if it is no already in my deck
-    // 2. Delete it from my deck if it already is in my deck
-    // Hint: checkout javascript standard array functions: 'findIndex'
+        {/* It would be cool to have some actions here... */}
+        <div className={classes.actions}>
+          <RandomizeAction onClick={randomizeDeck(pokemon)} />
+          <DownloadAction onClick={downloadDeck} />
+          <ClearAction onClick={clearDeck} />
+        </div>
 
-    setDeck(newDeck);
-  };
+        {/* This is a cool feature for loading a friends deck! */}
+        <DeckForm className={classes.deckForm} fetchDeck={fetchDeck} />
 
-  const isSelected = (pokemon) => {
-    // Given a pokemon, how can i tell if it is in my deck or not?
-    const found = deck.findIndex((p) => p?.id === pokemon.id);
-    return found !== -1;
-  };
+        <div ref={ref} className={classes.deck}>
+          {/* Where are my cards? */}
+          <PokemonCards>
+            {deck?.map((p, i) => (
+              <Card key={p?.id || `index${i}`} pokemon={p} onClick={toggleHandler(p)} isSelected />
+            ))}
+          </PokemonCards>
+        </div>
+      </section>
 
-  const clearDeck = () => {
-    // How should I clear this deck?
-    setDeck(initialState);
-  };
+      {/* Show me some pokemon cards! */}
+      <PokemonCards>
+        {pokemon?.map((p) => (
+          <Card
+            key={p.id}
+            pokemon={p}
+            onKeyDown={toggleHandler(p)}
+            onClick={toggleHandler(p)}
+            isSmall
+            isSelected={isSelected(p)}
+          />
+        ))}
+      </PokemonCards>
 
-  const downloadDeck = () => {
-    // I want to download this deck to use as my db.json
-    // Check out ./utils/download-utils.js
-    download(
-      'deck.json',
-      JSON.stringify(
-        deck.map((x) => {
-          return { id: x.id };
-        })
-      ),
-      'application/json'
-    );
-  };
+      {/* This is a cool feature for when you scroll and still want to see your deck! */}
+      {!isDeckOnScreen && (
+        <div className={classes.floatingDeck}>
+          <h4>Deck</h4>
+          {deck?.map((p, i) => (
+            <Sprite key={p?.id || `index${i}`} pokemon={p} height={46} onClick={toggleHandler(p)} />
+          ))}
+        </div>
+      )}
+    </Layout>
+  );
+}
 
-  const randomizeDeck = (pokemon) => () => {
-    // Given a list of pokemon, how can I generate a random deck?
-    // Hint: How can I generate a random list of indices?
-    const arrIndices = [];
-    while (arrIndices.length < 6) {
-      const r = Math.floor(Math.random() * pokemon.length); // random pokemon index
-      if (arrIndices.indexOf(r) === -1) {
-        arrIndices.push(r);
-      }
-    }
-    setDeck(arrIndices.map((i) => pokemon[i]));
-  };
-
-  const fetchDeck = async (url) => {
-    let error = null;
-    try {
-      const {
-        data: { deck, name }
-      } = await axios.get(url);
-
-      // What do we need to do with this data from our server?
-      // If deck is just a list of ids, how can I load the actual data?
-      // Hint: Checkout ./pokeapi/fetch-pokemon'
-      // error = new Error(`What am I supposed to do with this??: ${JSON.stringify({ deck, name })}`);
-
-      const result = await fetchPokemonByIds(
-        deck.map((x) => {
-          return x.id;
-        })
-      );
-      setDeck(result.pokemon);
-      setName(name);
-    } catch (e) {
-      error = e;
-    }
-    return error;
-  };
-
-  return {
-    deck,
-    name,
-    clearDeck,
-    downloadDeck,
-    randomizeDeck,
-    fetchDeck,
-    toggleHandler,
-    isSelected
-  };
+Home.propTypes = {
+  pokemon: PropTypes.array
 };
